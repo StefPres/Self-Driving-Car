@@ -10,7 +10,6 @@ float distance;
 uchar t;
 //void send_data(short a1,short b1,short c1,short d1,short e1,short f1);
 uchar data[16];
-int thresh = 93;
 int loSpeed = 0;
 int medSpeed = 50;
 int hiSpeed = 70;
