@@ -15,6 +15,7 @@ import imutils
 import time
 import serial
 
+
 arduino = serial.Serial('/dev/ttyACM0', 115200)
 horiz = ""
 vert = ""
@@ -30,8 +31,7 @@ ap.add_argument("-x", "--horizontal", type=int, default=480, help="Horizontal sc
 ap.add_argument("-y", "--vertical", type=int, default=360, help="Vertical screen size")
 ap.add_argument("-s", "--size", type=int, default=8, help="Object Size")
 args = vars(ap.parse_args())
-ap.add_argument("-i", "--image", required=True,
-	help="path to input image")
+
 
 # define the lower and upper boundaries of the "green"
 # ball in the HSV color space
@@ -45,6 +45,9 @@ counter = 0
 direction = ""
 screenx = args["horizontal"]
 screeny = args["vertical"]
+code = []
+codestring = ""
+
 
 # if a video path was not supplied, grab the reference
 # to the webcam
@@ -78,60 +81,29 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
 
     # resize the frame, blur it, and convert it to the HSV
     # color space
-    #frame = imutils.resize(frame, width=600)
-    blurred = cv2.GaussianBlur(frame, (11, 11), 0)
-    hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
-
-    # construct a mask for the color "green", then perform
-    # a series of dilations and erosions to remove any small
-    # blobs left in the mask
-    mask = cv2.inRange(hsv, greenLower, greenUpper)
-    mask = cv2.erode(mask, None, iterations=2)
-    mask = cv2.dilate(mask, None, iterations=2)
-
-    # find contours in the mask and initialize the current
-    # (x, y) center of the ball
-    cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
-        cv2.CHAIN_APPROX_SIMPLE)
-    cnts = cnts[0] if imutils.is_cv2() else cnts[1]
-    center = None
-
-    # only proceed if at least one contour was found
-    if len(cnts) > 0:
-        # find the largest contour in the mask, then use
-        # it to compute the minimum enclosing circle and
-        # centroid
-        c = max(cnts, key=cv2.contourArea)
-        ((x, y), radius) = cv2.minEnclosingCircle(c)
-        M = cv2.moments(c)
-        center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-
-        # only proceed if the radius meets a minimum size
-        if radius > args["size"]:
-            # draw the circle and centroid on the frame,
-            # then update the list of tracked poi
-            centerx = int(x)
-            centery = int(y)
-            if(centerx > (screenx*2/3)):
-                print("right")
-                horiz = "right"
-            elif((centerx >= (screenx/3)) and (centerx <= (screenx*2/3))):
-                print("horizontal center")
-                horiz = "center"
-            else:
-                print("left")
-                horiz = "left"
-
-            if(centery > (screeny*2/3)):
-                print("down")
-                vert = "down"
-            elif((centery >= (screeny/3)) and (centery <= (screeny*2/3))):
-                print("center")
-                vert = "center"
-            else:
-                print('up')
-                vert = "up"
-            arduino.write(horiz + "," + vert + "\n")
+	barcodes = pyzbar.decode(frame)
+   for barcode in barcodes:
+	codestring = "" # reset the codestring
+	# extract the bounding box location of the barcode and draw the
+	# bounding box surrounding the barcode on the image
+	(x, y, w, h) = barcode.rect
+	cv2.rectangle(image, (x, y), (x + w, y + h), (0, 0, 255), 2)
+ 
+	# the barcode data is a bytes object so if we want to draw it on
+	# our output image we need to convert it to a string first
+	barcodeData = barcode.data.decode("utf-8")
+	barcodeType = barcode.type
+        text = "{} ({})".format(barcodeData, barcodeType)
+		cv2.putText(frame, text, (x, y - 10),
+			cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+	# only proceed if the radius meets a minimum size
+        code = barcodeData.split() # Code format is DIRx PWRxxx TRNx TRRx TRTx
+	
+	for i in range(0, 5, 1):
+		stuff = code[i]
+		codestring += stuff[2, len.stuff]
+        
+	arduino.write(codestring)
 
 
     # show the frame to our screen and increment the frame counter
